@@ -1,0 +1,15 @@
+[package]
+name = "hack_cli"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.53"
+structopt = "0.3"
+tokio = { version = "1", features = ["full"] }
+crtsh_data = { path = "../crtsh_data" }
+port_scan = { path = "../port_scan" }
+reqwest = "0.11"
+futures = "0.3"

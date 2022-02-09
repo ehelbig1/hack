@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "hack_cli",
+    "crtsh_data",
+    "port_scan"
+]
