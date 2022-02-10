@@ -1,36 +1,35 @@
 mod common_ports;
+mod error;
 pub mod model;
 
-use futures::{stream, StreamExt};
+use futures::{stream, StreamExt, TryStreamExt};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::net::{lookup_host, TcpStream};
 
 use common_ports::MOST_COMMON_PORTS;
-use model::Port;
+use error::Error;
+use model::{Port, PortScanResult};
 
-pub async fn scan_ports(domain: Arc<String>) -> (Arc<String>, Vec<Port>) {
+pub async fn scan_ports(domain: Arc<String>) -> Result<PortScanResult, Error> {
     let ports = stream::iter(MOST_COMMON_PORTS.into_iter())
         .map(|port| scan_port(domain.clone(), *port))
         .buffer_unordered(100)
-        .collect()
-        .await;
+        .try_collect()
+        .await?;
 
-    (domain, ports)
+    Ok(PortScanResult { domain, ports })
 }
 
-async fn scan_port(domain: Arc<String>, port: u16) -> Port {
+async fn scan_port(domain: Arc<String>, port: u16) -> Result<Port, Error> {
     let timeout = Duration::from_secs(3);
     let socket_address = format!("{}:{}", *domain, port);
-    let socket_address: Vec<SocketAddr> = lookup_host(socket_address)
-        .await
-        .expect("port scanner: creating socket addr")
-        .collect();
+    let socket_address: Vec<SocketAddr> = lookup_host(socket_address).await?.collect();
 
     if socket_address.len() == 0 {
-        return Port {
+        return Ok(Port {
             port,
             is_open: false,
-        };
+        });
     };
 
     let is_open = if let Ok(_) =
@@ -41,7 +40,7 @@ async fn scan_port(domain: Arc<String>, port: u16) -> Port {
         false
     };
 
-    Port { port, is_open }
+    Ok(Port { port, is_open })
 }
 
 #[cfg(test)]

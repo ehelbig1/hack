@@ -1,7 +1,10 @@
 use anyhow::Result;
 use crtsh_data::{CrtShDatasource, Datasource};
-use futures::{stream, StreamExt};
-use port_scan::{model::Port, scan_ports};
+use futures::{stream, StreamExt, TryStreamExt};
+use port_scan::{
+    model::{Port, PortScanResult},
+    scan_ports,
+};
 use std::{
     collections::HashSet,
     fs::File,
@@ -48,21 +51,26 @@ impl Opt {
                 let file = File::open(&opt.file).expect("Error reading file");
                 let reader = BufReader::new(&file);
 
-                let open_ports: Vec<(Arc<String>, Vec<Port>)> = stream::iter(reader.lines())
+                let open_ports: Vec<PortScanResult> = stream::iter(reader.lines())
                     .map(|line| {
                         let line = Arc::new(line.unwrap());
                         scan_ports(line.clone())
                     })
                     .buffer_unordered(100)
-                    .collect::<Vec<(Arc<String>, Vec<Port>)>>()
-                    .await
+                    .try_collect::<Vec<PortScanResult>>()
+                    .await?
                     .into_iter()
-                    .map(|ports| {
-                        let open_ports: Vec<Port> = ports.1.into_iter()
+                    .map(|scan| {
+                        let open_ports = scan
+                            .ports
+                            .into_iter()
                             .filter(|port| port.is_open)
-                            .collect();
+                            .collect::<Vec<Port>>();
 
-                        (ports.0, open_ports)
+                        PortScanResult {
+                            domain: scan.domain,
+                            ports: open_ports,
+                        }
                     })
                     .collect();
 
